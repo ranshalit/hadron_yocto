@@ -7,6 +7,8 @@ inherit pypi setuptools3
 
 SRC_URI[sha256sum] = "2b44434d28d49257e859a4830267a25aa4b51b1d229f95f79d025ae7f1a5d30e"
 
+SRC_URI += "file://0001-fix-pyproject-license-format-for-older-setuptools.patch"
+
 RDEPENDS:${PN} += "python3-core"
 
 BBCLASSEXTEND = "native nativesdk"
