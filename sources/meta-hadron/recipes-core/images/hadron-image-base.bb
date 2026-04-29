@@ -13,6 +13,21 @@ IMAGE_INSTALL:append = " \
     iproute2 \
     net-tools \
     sudo \
+    gstreamer1.0 \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    gstreamer1.0-python \
+    python3-opencv \
+    boost \
+    libxml2 \
+    python3-pyserial \
+    python3-cython \
+    python3-psutil \
+    python3-pymavlink \
+    python3-v4l2py \
 "
 
 IMAGE_FEATURES:append = " ssh-server-openssh"

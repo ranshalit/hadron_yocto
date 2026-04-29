@@ -41,3 +41,4 @@ local_conf_header:
     SSTATE_DIR ?= "${TOPDIR}/../sstate-cache"
     IMAGE_ROOTFS_SIZE = "8388608"
     INIT_MANAGER = "systemd"
+    LICENSE_FLAGS_ACCEPTED += "commercial"
