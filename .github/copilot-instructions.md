@@ -154,6 +154,28 @@ The Yocto `tegraflash.tar.gz` contains CTI-specific bootloader configs (MB2-BCT 
 
 ---
 
+## Default Login Credentials
+
+| User | Password | Notes |
+|---|---|---|
+| `ubuntu` | `ubuntu` | Has `sudo` access |
+| `root` | (locked) | Use `sudo su` from ubuntu |
+
+### Password Hash in Recipe (`hadron-image-base.bb`)
+
+The SHA-512 hash must use **`\$` instead of `$`** in BitBake:
+
+```bitbake
+UBUNTU_PASSWD = "\$6\$salt\$hash..."
+```
+
+**Why:** `extrausers.bbclass` assigns `EXTRA_USERS_PARAMS` inside a double-quoted shell
+string. Bare `$6`, `$f`, `$7...` get shell-expanded to empty, corrupting the hash.
+BitBake preserves the backslash; the shell then interprets `\$` as literal `$`.
+To regenerate: `openssl passwd -6 ubuntu` — then escape every `$` as `\$` in the recipe.
+
+---
+
 ## Why `--network usb0` Works (and `initrd-flash` Doesn't)
 
 | Method | Mechanism | NVMe detection | Result |
