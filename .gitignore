@@ -1,0 +1,22 @@
+# Yocto build artefacts (large, reproducible via kas build)
+build/
+downloads/
+sstate-cache/
+build.log
+
+# Kas-managed external layers (cloned automatically by kas)
+sources/poky/
+sources/meta-openembedded/
+sources/meta-tegra/
+poky/
+meta-openembedded/
+meta-tegra/
+
+# Editor / OS noise
+.DS_Store
+*.swp
+*.swo
+*~
+__pycache__/
+*.pyc
+build.pid

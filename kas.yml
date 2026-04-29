@@ -1,0 +1,43 @@
+header:
+  version: 14
+
+machine: hadron-ngx012
+distro: poky
+target: hadron-image-base
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: scarthgap
+    layers:
+      meta:
+      meta-poky:
+
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded
+    branch: scarthgap
+    layers:
+      meta-oe:
+      meta-python:
+      meta-networking:
+
+  meta-tegra:
+    url: https://github.com/OE4T/meta-tegra
+    branch: scarthgap
+    commit: 447c21467f65be2389f68a189b6871f13729d222
+    layers:
+      .:
+
+  meta-hadron:
+    path: sources/meta-hadron
+    layers:
+      .:
+
+local_conf_header:
+  standard: |
+    BB_NUMBER_THREADS ?= "${@oe.utils.cpu_count()}"
+    PARALLEL_MAKE ?= "-j ${@oe.utils.cpu_count()}"
+    DL_DIR ?= "${TOPDIR}/../downloads"
+    SSTATE_DIR ?= "${TOPDIR}/../sstate-cache"
+    IMAGE_ROOTFS_SIZE = "8388608"
+    INIT_MANAGER = "systemd"
