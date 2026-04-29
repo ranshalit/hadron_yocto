@@ -42,3 +42,6 @@ local_conf_header:
     IMAGE_ROOTFS_SIZE = "8388608"
     INIT_MANAGER = "systemd"
     LICENSE_FLAGS_ACCEPTED += "commercial"
+    # OpenCV: disable CUDA build — we only need Python bindings, not GPU acceleration.
+    # gcc-for-nvcc-cross fails to compile on Ubuntu 22.04 host (GCC 13.2 linker errors).
+    PACKAGECONFIG:remove:pn-opencv = "cuda dnn"
