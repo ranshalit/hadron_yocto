@@ -30,3 +30,11 @@ EXTRA_USERS_PARAMS = "\
     useradd -m -s /bin/bash -G sudo ubuntu; \
     usermod -p '${UBUNTU_PASSWD}' ubuntu; \
 "
+
+# Yocto's default sudoers does not grant the sudo group access — add it explicitly.
+ROOTFS_POSTPROCESS_COMMAND:append = " setup_sudo_group;"
+setup_sudo_group() {
+    install -d ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d
+    echo '%sudo ALL=(ALL:ALL) ALL' > ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/sudo-group
+    chmod 440 ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/sudo-group
+}
