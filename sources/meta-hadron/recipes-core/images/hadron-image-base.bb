@@ -10,6 +10,8 @@ IMAGE_INSTALL:append = " \
     kernel-module-bmi160-core \
     kernel-module-bmi160-i2c \
     bmi160-config \
+    iproute2 \
+    net-tools \
     sudo \
 "
 
