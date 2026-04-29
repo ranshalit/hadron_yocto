@@ -1,0 +1,7 @@
+# Instantiate BMI160 IMU on the 40-pin header I2C bus.
+# Address 0x69: SDO pin is pulled to VCC on this board.
+# Wildcard matches all I2C buses — the BMI160 will only respond on the bus it is
+# physically wired to. Confirm the bus with: i2cdetect -l && i2cdetect -r -y <N>
+# modprobe is included in case systemd-modules-load hasn't run yet when this fires.
+ACTION=="add", SUBSYSTEM=="i2c", KERNEL=="i2c-[0-9]*", \
+    RUN+="/bin/sh -c 'modprobe bmi160_i2c && echo bmi160 0x69 > /sys/bus/i2c/devices/%k/new_device'"

@@ -9,6 +9,7 @@ IMAGE_INSTALL:append = " \
     hadron-network \
     kernel-module-bmi160-core \
     kernel-module-bmi160-i2c \
+    bmi160-config \
     sudo \
 "
 
