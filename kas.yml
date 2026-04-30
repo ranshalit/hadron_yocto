@@ -20,6 +20,9 @@ repos:
       meta-oe:
       meta-python:
       meta-networking:
+      meta-gnome:
+      meta-multimedia:
+      meta-xfce:
 
   meta-tegra:
     url: https://github.com/OE4T/meta-tegra

@@ -1,0 +1,24 @@
+[Unit]
+Description=NoMachine first-boot setup
+Documentation=https://support.connecttech.com/hc/en-us/articles/21021396828571
+After=network.target
+# nxserver.service must wait for this to complete (nx user + PAM + certs not ready before)
+Before=nxserver.service
+# Only run once — sentinel written by ExecStartPost on success
+ConditionPathExists=!/usr/NX/.setup-done
+
+[Service]
+Type=oneshot
+# Runs the NoMachine setup script: creates nx/nxhtd users, configures PAM,
+# generates SSL certs, copies config files, and enables nxserver.service.
+ExecStart=/usr/NX/scripts/setup/nxserver --install
+# Patch DefaultDesktopCommand after nxserver --install creates node.cfg from sample.
+# Guard: nxserver --install may not create node.cfg on all distro profiles.
+# The node-*.cfg.sample files are pre-patched at build time so this is belt-and-suspenders.
+ExecStartPost=/bin/sh -c \
+    'test -f /usr/NX/etc/node.cfg && sed -i "s|^#*DefaultDesktopCommand .*|DefaultDesktopCommand \"/usr/bin/startxfce4\"|" /usr/NX/etc/node.cfg || true'
+ExecStartPost=/bin/touch /usr/NX/.setup-done
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
