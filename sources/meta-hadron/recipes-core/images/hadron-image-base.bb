@@ -28,6 +28,7 @@ IMAGE_INSTALL:append = " \
     python3-psutil \
     python3-pymavlink \
     python3-v4l2py \
+    wasp-version \
 "
 
 IMAGE_FEATURES:append = " ssh-server-openssh"
@@ -48,7 +49,7 @@ EXTRA_USERS_PARAMS = "\
 
 # Yocto's default sudoers does not grant the sudo group access — add it explicitly.
 # Also add /sbin:/usr/sbin to PATH for all users (Yocto only adds them for root).
-ROOTFS_POSTPROCESS_COMMAND:append = " setup_sudo_group; setup_sbin_path;"
+ROOTFS_POSTPROCESS_COMMAND:append = " setup_sudo_group; setup_sbin_path; stamp_wasp_version;"
 setup_sudo_group() {
     install -d ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d
     echo '%sudo ALL=(ALL:ALL) ALL' > ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/sudo-group
@@ -57,4 +58,9 @@ setup_sudo_group() {
 setup_sbin_path() {
     install -d ${IMAGE_ROOTFS}${sysconfdir}/profile.d
     echo 'export PATH="$PATH:/usr/sbin:/sbin"' > ${IMAGE_ROOTFS}${sysconfdir}/profile.d/sbin-path.sh
+}
+# Append the image build timestamp as the second line of /etc/wasp/version/version.txt.
+# Runs every do_rootfs so the date always reflects the actual image build time.
+stamp_wasp_version() {
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${IMAGE_ROOTFS}${sysconfdir}/wasp/version/version.txt
 }
