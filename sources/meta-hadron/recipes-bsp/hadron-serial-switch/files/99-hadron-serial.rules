@@ -1,0 +1,8 @@
+# hadron-serial — serial port roles for the Hadron NGX012
+#
+# Prevent ModemManager from claiming these ports as cellular modems.
+# ttyTHS1 is the primary console UART; ttyTCU0 is the SoC debug UART
+# (available as a plain userspace serial device after console handover).
+
+KERNEL=="ttyTHS1", ENV{ID_MM_DEVICE_IGNORE}="1"
+KERNEL=="ttyTCU0", ENV{ID_MM_DEVICE_IGNORE}="1"

@@ -1,0 +1,194 @@
+#!/bin/sh
+# hadron-serial-switch — redirect serial console between ttyTHS1 and ttyTCU0
+#
+# Usage:
+#   hadron-serial-switch [--baud <rate>] ttyTHS1 | ttyTCU0
+#   hadron-serial-switch --status
+#
+# What it changes:
+#   1. /boot/extlinux/extlinux.conf  — console= kernel arg (takes effect on next boot)
+#   2. systemd serial-getty service  — active immediately (no reboot required)
+#   3. journald forwarding drop-in   — active immediately (no reboot required)
+#
+# Bootloader (UEFI/BPMP) messages are NOT affected; they stay on TCU0.
+
+set -e
+
+EXTLINUX=/boot/extlinux/extlinux.conf
+BAUD=115200
+TARGET=
+KNOWN_TTYS="ttyTHS0 ttyTHS1 ttyTHS2 ttyTHS3 ttyTHS4 ttyTCU0"
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+usage() {
+    cat >&2 <<EOF
+Usage: $(basename "$0") [--baud <rate>] <tty>
+       $(basename "$0") --status
+
+  <tty>   Target serial device name (e.g. ttyTHS1, ttyTCU0)
+  --baud  Baud rate to use (default: 115200)
+  --status  Show the current active console TTY
+
+Examples:
+  $(basename "$0") ttyTHS1
+  $(basename "$0") --baud 9600 ttyTHS1
+  $(basename "$0") ttyTCU0
+  $(basename "$0") --status
+EOF
+    exit 1
+}
+
+JOURNALD_DROP_IN=/etc/systemd/journald.conf.d/10-hadron-console.conf
+
+show_status() {
+    echo "=== Serial console status ==="
+    echo
+    if [ -f "$EXTLINUX" ]; then
+        echo "extlinux.conf console= args (takes effect at next boot):"
+        grep -o 'console=[^ ]*' "$EXTLINUX" | sort -u | sed 's/^/  /'
+    else
+        echo "  $EXTLINUX not found"
+    fi
+    echo
+    echo "Active serial-getty instances:"
+    systemctl list-units --type=service --state=active 'serial-getty@*' \
+        --no-legend --no-pager 2>/dev/null | awk '{print "  " $1}' || true
+    echo
+    echo "Enabled serial-getty instances:"
+    systemctl list-unit-files --type=service 'serial-getty@*' \
+        --no-legend --no-pager 2>/dev/null \
+        | grep enabled | awk '{print "  " $1}' || true
+    echo
+    echo "journald console forwarding:"
+    if [ -f "$JOURNALD_DROP_IN" ]; then
+        grep -E 'ForwardToConsole|TTYPath' "$JOURNALD_DROP_IN" | sed 's/^/  /'
+    else
+        echo "  (disabled — drop-in not present)"
+    fi
+}
+
+# Parse arguments
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --status)
+            show_status
+            exit 0
+            ;;
+        --baud)
+            [ $# -ge 2 ] || die "--baud requires an argument"
+            BAUD="$2"
+            shift 2
+            ;;
+        --baud=*)
+            BAUD="${1#--baud=}"
+            shift
+            ;;
+        -h|--help)
+            usage
+            ;;
+        tty*)
+            [ -z "$TARGET" ] || die "Only one target TTY may be specified"
+            TARGET="$1"
+            shift
+            ;;
+        *)
+            die "Unknown argument: $1"
+            ;;
+    esac
+done
+
+[ -n "$TARGET" ] || usage
+
+# Must run as root
+[ "$(id -u)" = "0" ] || die "This script must be run as root (use sudo)"
+
+# Validate the TTY node exists
+[ -c "/dev/$TARGET" ] || die "/dev/$TARGET does not exist or is not a character device"
+
+# Warn if target is not a commonly known serial UART on this platform
+_known=0
+for t in $KNOWN_TTYS; do
+    [ "$t" = "$TARGET" ] && { _known=1; break; }
+done
+[ "$_known" = "1" ] || echo "WARNING: $TARGET is not a standard serial port on the Hadron NGX012 (known: $KNOWN_TTYS)"
+
+# Validate baud rate is numeric
+case "$BAUD" in
+    ''|*[!0-9]*) die "Baud rate must be a positive integer, got: $BAUD" ;;
+esac
+
+echo "Switching serial console to $TARGET at $BAUD baud..."
+echo
+
+# ── 1. Update /boot/extlinux/extlinux.conf ────────────────────────────────────
+if [ ! -f "$EXTLINUX" ]; then
+    echo "WARNING: $EXTLINUX not found — skipping extlinux.conf update"
+else
+    # Detect current serial UART console (ttyTHS* or ttyTCU*), excluding tty0/ttyS*/hvc*
+    OLD_TTY=$(grep -o 'console=tty[TH][HSC][A-Za-z0-9]*,[0-9]*' "$EXTLINUX" \
+              | head -1 | sed 's/console=//;s/,.*//' || true)
+
+    if [ -z "$OLD_TTY" ]; then
+        echo "  extlinux.conf: no existing console=ttyTH*/ttyTC* found — adding console=$TARGET,$BAUD"
+        # Append at end of the APPEND line — last console= wins as primary.
+        # Uses portable POSIX BRE (/^\s*APPEND/) safe for busybox sed.
+        sed -i '/^\s*APPEND/s/$/ console='"$TARGET,$BAUD"'/' "$EXTLINUX"
+    elif [ "$OLD_TTY" = "$TARGET" ]; then
+        echo "  extlinux.conf: already set to $TARGET — updating baud to $BAUD"
+        sed -i "s|console=${OLD_TTY},[0-9]*|console=$TARGET,$BAUD|g" "$EXTLINUX"
+    else
+        echo "  extlinux.conf: replacing console=$OLD_TTY,* with console=$TARGET,$BAUD"
+        sed -i "s|console=${OLD_TTY},[0-9]*|console=$TARGET,$BAUD|g" "$EXTLINUX"
+    fi
+
+    echo "  extlinux.conf updated. Kernel console change takes effect after reboot."
+fi
+
+# ── 2. Manage systemd serial-getty services ──────────────────────────────────
+NEW_GETTY="serial-getty@${TARGET}.service"
+
+# Disable and stop any currently enabled serial-getty on a different tty
+for t in $KNOWN_TTYS; do
+    [ "$t" = "$TARGET" ] && continue
+    svc="serial-getty@${t}.service"
+    # Check if enabled (symlink exists or systemctl reports enabled)
+    if systemctl is-enabled "$svc" >/dev/null 2>&1; then
+        echo "  Disabling and stopping $svc"
+        systemctl disable --now "$svc" 2>/dev/null || true
+    fi
+done
+
+# Enable and start the target getty
+if systemctl is-enabled "$NEW_GETTY" >/dev/null 2>&1; then
+    echo "  $NEW_GETTY already enabled"
+else
+    echo "  Enabling $NEW_GETTY"
+    systemctl enable "$NEW_GETTY"
+fi
+
+if systemctl is-active "$NEW_GETTY" >/dev/null 2>&1; then
+    echo "  $NEW_GETTY already running"
+else
+    echo "  Starting $NEW_GETTY"
+    systemctl start "$NEW_GETTY"
+fi
+
+# ── 3. Update journald console forwarding ─────────────────────────────────────
+mkdir -p /etc/systemd/journald.conf.d
+printf '[Journal]\nForwardToConsole=yes\nTTYPath=/dev/%s\nMaxLevelConsole=info\n' "$TARGET" \
+    > "$JOURNALD_DROP_IN"
+echo "  journald: forwarding to /dev/$TARGET"
+systemctl restart systemd-journald 2>/dev/null || true
+
+echo
+echo "Done."
+echo "  getty:    active on /dev/$TARGET (effective immediately)"
+echo "  journald: forwarding to /dev/$TARGET (effective immediately)"
+echo "  kernel:   console= will switch to $TARGET after reboot"
+# Remind the user about the companion port
+if [ "$TARGET" = "ttyTHS1" ]; then
+    echo "  ttyTCU0:  getty disabled — free for userspace applications"
+elif [ "$TARGET" = "ttyTCU0" ]; then
+    echo "  ttyTHS1:  getty disabled — free for userspace applications"
+fi

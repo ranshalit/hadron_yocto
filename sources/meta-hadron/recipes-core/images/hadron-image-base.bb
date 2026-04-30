@@ -29,6 +29,7 @@ IMAGE_INSTALL:append = " \
     python3-pymavlink \
     python3-v4l2py \
     wasp-version \
+    hadron-serial-switch \
 "
 
 IMAGE_FEATURES:append = " ssh-server-openssh"
