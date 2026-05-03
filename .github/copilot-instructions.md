@@ -185,6 +185,70 @@ To regenerate: `openssl passwd -6 ubuntu` — then escape every `$` as `\$` in t
 
 ---
 
+## Running QEMU (for local testing without hardware)
+
+Use `run-qemu.sh` in the project root to boot `hadron-image-base` directly in QEMU
+(`qemu-system-aarch64 -M virt`). The Tegra kernel has `CONFIG_VIRTIO_BLK`,
+`CONFIG_VIRTIO_NET`, and `CONFIG_SERIAL_AMBA_PL011` built-in, so it boots on the virt
+machine without modification.
+
+> ℹ️ QEMU virt creates only **one PL011 UART** (`ttyAMA0`). On real hardware there are two
+> serial ports (ttyTCU0 for bootloader/EFI debug, ttyTHS1 for Linux console), but in QEMU
+> direct-kernel-boot there is no bootloader stage so a single serial covers everything.
+
+### Prerequisites
+
+```bash
+sudo apt install qemu-system-arm socat
+```
+
+### Start QEMU
+
+```bash
+cd /media/ranshal/jetson/hadron_yocto
+./run-qemu.sh
+```
+
+The script prints the log path and socket path, then starts QEMU headless. The rootfs is
+opened as a **snapshot** — the original `.ext4` is never modified.
+
+### Tail the boot log (second terminal)
+
+```bash
+tail -f /tmp/hadron-qemu/console.log
+```
+
+Expect the login prompt in **~30 seconds**.
+
+### Interactive login
+
+```bash
+socat - unix-connect:/tmp/hadron-qemu/console.sock
+```
+
+Log in as `ubuntu` / `ubuntu`. Exit socat with `Ctrl+]` then `Ctrl+C`.
+
+### Environment variable
+
+Set `HADRON_QEMU_LOGS` to override the default log/socket directory (`/tmp/hadron-qemu`):
+
+```bash
+HADRON_QEMU_LOGS=/my/dir ./run-qemu.sh
+```
+
+### Known limitations in QEMU
+
+| Feature | Status |
+|---|---|
+| Kernel + systemd boot | ✅ Works |
+| Network (virtio-net, user-mode NAT) | ✅ Works |
+| SSH into QEMU guest | ✅ `ssh ubuntu@localhost -p 2222` (add `-netdev user,...,hostfwd=tcp::2222-:22` if needed) |
+| GPU / CUDA | ❌ No Tegra GPU in virt machine |
+| nvpmodel / nvfancontrol | ❌ Fail gracefully (no Tegra hardware) |
+| ESP partition mount | ✅ Masked via kernel cmdline (`systemd.mask=`) |
+
+---
+
 ## CTI BCT Notes
 
 The `tegra234-cti-orin-nx-mb2-bct-misc.dts` sets `cvb_eeprom_read_size=0`, which is
