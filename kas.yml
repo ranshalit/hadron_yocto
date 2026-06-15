@@ -40,8 +40,8 @@ local_conf_header:
   standard: |
     BB_NUMBER_THREADS ?= "${@oe.utils.cpu_count()}"
     PARALLEL_MAKE ?= "-j ${@oe.utils.cpu_count()}"
-    DL_DIR ?= "${TOPDIR}/../downloads"
-    SSTATE_DIR ?= "${TOPDIR}/../sstate-cache"
+    DL_DIR = "/media/ranshal/jetson/shared/downloads"
+    SSTATE_DIR = "/media/ranshal/jetson/shared/sstate"
     IMAGE_ROOTFS_SIZE = "8388608"
     INIT_MANAGER = "systemd"
     LICENSE_FLAGS_ACCEPTED += "commercial"
