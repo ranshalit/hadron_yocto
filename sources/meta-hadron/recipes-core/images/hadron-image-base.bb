@@ -32,6 +32,7 @@ IMAGE_INSTALL:append = " \
     hadron-serial-switch \
     ffmpeg \
     docker-moby \
+    nvidia-container-toolkit \
 "
 
 IMAGE_FEATURES:append = " ssh-server-openssh"
