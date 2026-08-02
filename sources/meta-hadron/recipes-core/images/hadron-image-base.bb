@@ -30,6 +30,8 @@ IMAGE_INSTALL:append = " \
     python3-v4l2py \
     wasp-version \
     hadron-serial-switch \
+    ffmpeg \
+    docker-moby \
 "
 
 IMAGE_FEATURES:append = " ssh-server-openssh"

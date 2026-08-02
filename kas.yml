@@ -20,6 +20,7 @@ repos:
       meta-oe:
       meta-python:
       meta-networking:
+      meta-filesystems:
       meta-gnome:
       meta-multimedia:
       meta-xfce:
@@ -36,6 +37,12 @@ repos:
     layers:
       .:
 
+  meta-virtualization:
+    url: https://git.yoctoproject.org/meta-virtualization
+    branch: scarthgap
+    layers:
+      .:
+
 local_conf_header:
   standard: |
     BB_NUMBER_THREADS ?= "${@oe.utils.cpu_count()}"
@@ -45,6 +52,8 @@ local_conf_header:
     IMAGE_ROOTFS_SIZE = "8388608"
     INIT_MANAGER = "systemd"
     LICENSE_FLAGS_ACCEPTED += "commercial"
+    # Docker (docker-moby) from meta-virtualization requires the virtualization distro feature.
+    DISTRO_FEATURES:append = " virtualization"
     # OpenCV: disable CUDA build — we only need Python bindings, not GPU acceleration.
     # gcc-for-nvcc-cross fails to compile on Ubuntu 22.04 host (GCC 13.2 linker errors).
     PACKAGECONFIG:remove:pn-opencv = "cuda dnn"
