@@ -33,6 +33,7 @@ IMAGE_INSTALL:append = " \
     ffmpeg \
     docker-moby \
     nvidia-container-toolkit \
+    libwebp \
 "
 
 IMAGE_FEATURES:append = " ssh-server-openssh"
