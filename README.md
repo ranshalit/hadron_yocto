@@ -47,10 +47,13 @@ copy the `.sh` over (e.g. `scp …toolchain-5.0.17.sh host:`), then run it:
 ### 3. Build a CMake app
 
 ```bash
-# Load the cross environment (sets CC, CXX, sysroot, OE_CMAKE_TOOLCHAIN_FILE, PATH)
+# Load the cross environment (sets CC, CXX, sysroot, CMAKE_TOOLCHAIN_FILE, PATH)
 source /opt/hadron-sdk/environment-setup-armv8a-poky-linux
 
-cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=$OE_CMAKE_TOOLCHAIN_FILE
+# The env already exports CMAKE_TOOLCHAIN_FILE, so no -D flag is needed.
+# (Do NOT pass -DCMAKE_TOOLCHAIN_FILE=$OE_CMAKE_TOOLCHAIN_FILE — that variable
+#  does not exist; passing it empty disables the sysroot and breaks find_library.)
+cmake -B build -G Ninja
 cmake --build build
 ```
 

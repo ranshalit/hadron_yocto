@@ -6,7 +6,7 @@ Minimal C++ CMake app to verify the Hadron cross-compile SDK works.
 
 ```bash
 source /opt/hadron-sdk/environment-setup-armv8a-poky-linux
-cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=$OE_CMAKE_TOOLCHAIN_FILE
+cmake -B build -G Ninja
 cmake --build build
 ```
 
