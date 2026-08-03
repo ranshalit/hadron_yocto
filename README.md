@@ -11,6 +11,81 @@ kas build kas.yml
 
 See also: https://connecttech.com/resource-center/l4t-board-support-packages/
 
+## SDK (cross-compiling apps on the host)
+
+The image ships a matching cross-toolchain SDK for building host-side C/C++
+applications (CMake, autotools, plain Make) against the exact device sysroot.
+The SDK bundles its own `cmake`, `ninja`, cross `gcc`/`g++`/`gdb`, and `-dev`
+headers for the libraries in the image (boost, opencv, gstreamer, ffmpeg, …),
+so it does not depend on the host's own cmake version.
+
+### 1. Build the SDK installer
+
+```bash
+kas shell kas.yml -c 'bitbake hadron-image-base -c populate_sdk'
+```
+
+Output (a self-extracting installer plus manifests) lands in:
+
+```
+build/tmp/deploy/images/../../deploy/sdk/
+  poky-glibc-x86_64-hadron-image-base-armv8a-hadron-ngx012-toolchain-5.0.17.sh
+```
+
+### 2. Tar it up (to move to another host)
+
+```bash
+cd build/tmp/deploy/sdk
+tar czf hadron-sdk-5.0.17.tar.gz \
+    poky-glibc-x86_64-hadron-image-base-armv8a-hadron-ngx012-toolchain-5.0.17.sh
+```
+
+Copy `hadron-sdk-5.0.17.tar.gz` to the build/dev host, then extract:
+
+```bash
+tar xzf hadron-sdk-5.0.17.tar.gz
+```
+
+### 3. Install the SDK
+
+```bash
+./poky-glibc-x86_64-hadron-image-base-armv8a-hadron-ngx012-toolchain-5.0.17.sh \
+    -y -d /opt/hadron-sdk
+```
+
+`-y` accepts defaults, `-d` sets the install directory (default `/opt/poky/5.0.17`).
+
+### 4. Build a CMake app
+
+```bash
+# Load the cross environment (sets CC, CXX, sysroot, OE_CMAKE_TOOLCHAIN_FILE, PATH)
+source /opt/hadron-sdk/environment-setup-armv8a-poky-linux
+
+cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=$OE_CMAKE_TOOLCHAIN_FILE
+cmake --build build
+```
+
+Minimal example (`CMakeLists.txt` + `main.cpp`):
+
+```cmake
+cmake_minimum_required(VERSION 3.10)
+project(hello CXX)
+add_executable(hello main.cpp)
+```
+
+```cpp
+#include <iostream>
+int main() { std::cout << "Hello from Hadron!" << std::endl; }
+```
+
+Verify the output is a Jetson (AArch64) binary, then copy it to the device and run:
+
+```bash
+file build/hello        # -> ELF 64-bit LSB pie executable, ARM aarch64
+scp build/hello ubuntu@192.168.132.100:~
+ssh ubuntu@192.168.132.100 ./hello
+```
+
 ## Image defaults
 
 | Item | Value |
