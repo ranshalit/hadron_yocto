@@ -34,9 +34,8 @@ build/tmp/deploy/images/../../deploy/sdk/
 
 ### 2. Install the SDK
 
-The installer is a single self-extracting file — no tar needed. To use it on
-another machine, just copy the `.sh` over (e.g. `scp …toolchain-5.0.17.sh host:`),
-then run it:
+The installer is a single self-extracting file. To use it on another machine,
+copy the `.sh` over (e.g. `scp …toolchain-5.0.17.sh host:`), then run it:
 
 ```bash
 ./poky-glibc-x86_64-hadron-image-base-armv8a-hadron-ngx012-toolchain-5.0.17.sh \
