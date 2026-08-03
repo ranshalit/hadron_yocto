@@ -32,21 +32,11 @@ build/tmp/deploy/images/../../deploy/sdk/
   poky-glibc-x86_64-hadron-image-base-armv8a-hadron-ngx012-toolchain-5.0.17.sh
 ```
 
-### 2. Tar it up (to move to another host)
+### 2. Install the SDK
 
-```bash
-cd build/tmp/deploy/sdk
-tar czf hadron-sdk-5.0.17.tar.gz \
-    poky-glibc-x86_64-hadron-image-base-armv8a-hadron-ngx012-toolchain-5.0.17.sh
-```
-
-Copy `hadron-sdk-5.0.17.tar.gz` to the build/dev host, then extract:
-
-```bash
-tar xzf hadron-sdk-5.0.17.tar.gz
-```
-
-### 3. Install the SDK
+The installer is a single self-extracting file — no tar needed. To use it on
+another machine, just copy the `.sh` over (e.g. `scp …toolchain-5.0.17.sh host:`),
+then run it:
 
 ```bash
 ./poky-glibc-x86_64-hadron-image-base-armv8a-hadron-ngx012-toolchain-5.0.17.sh \
@@ -55,7 +45,7 @@ tar xzf hadron-sdk-5.0.17.tar.gz
 
 `-y` accepts defaults, `-d` sets the install directory (default `/opt/poky/5.0.17`).
 
-### 4. Build a CMake app
+### 3. Build a CMake app
 
 ```bash
 # Load the cross environment (sets CC, CXX, sysroot, OE_CMAKE_TOOLCHAIN_FILE, PATH)
