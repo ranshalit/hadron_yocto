@@ -42,6 +42,22 @@ IMAGE_FEATURES:append = " ssh-server-openssh"
 # apps on the host does not depend on the host's own cmake version.
 TOOLCHAIN_HOST_TASK:append = " nativesdk-cmake nativesdk-ninja"
 
+# Stage the OpenCV contrib modules that the image itself does not install into
+# the SDK target sysroot only (not the device image). Without them,
+# find_package(OpenCV) fails: the OpenCV -dev OpenCVModules.cmake references
+# every built module, and these 6 runtime .so are otherwise missing, so CMake
+# aborts with 'imported target opencv_datasets references a file that does not
+# exist'. Adding them here keeps the flashed image lean while making
+# find_package(OpenCV) work for host cross-builds.
+TOOLCHAIN_TARGET_TASK:append = " \
+    libopencv-datasets-dev \
+    libopencv-dpm-dev \
+    libopencv-superres-dev \
+    libopencv-ts-dev \
+    libopencv-videostab-dev \
+    libopencv-xobjdetect-dev \
+"
+
 inherit extrausers
 
 # SHA-512 crypt hash of 'ubuntu'. Regenerate with: openssl passwd -6 ubuntu
