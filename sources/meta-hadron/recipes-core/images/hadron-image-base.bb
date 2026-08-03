@@ -42,13 +42,17 @@ IMAGE_FEATURES:append = " ssh-server-openssh"
 # apps on the host does not depend on the host's own cmake version.
 TOOLCHAIN_HOST_TASK:append = " nativesdk-cmake nativesdk-ninja"
 
-# Stage the OpenCV contrib modules that the image itself does not install into
-# the SDK target sysroot only (not the device image). Without them,
-# find_package(OpenCV) fails: the OpenCV -dev OpenCVModules.cmake references
-# every built module, and these 6 runtime .so are otherwise missing, so CMake
-# aborts with 'imported target opencv_datasets references a file that does not
-# exist'. Adding them here keeps the flashed image lean while making
-# find_package(OpenCV) work for host cross-builds.
+# Stage extra libraries that the device image does not need at runtime into the
+# SDK target sysroot only (not the flashed image), so host cross-builds can find
+# them:
+#   * OpenCV contrib modules (datasets/dpm/superres/ts/videostab/xobjdetect):
+#     the OpenCV -dev OpenCVModules.cmake references every built module, so
+#     without these 6 runtime .so, find_package(OpenCV) aborts with 'imported
+#     target opencv_datasets references a file that does not exist'.
+#   * serial (wjwwood): a static-only lib (libserial.a in -staticdev, headers +
+#     serialConfig.cmake in -dev). The runtime 'serial' package is empty, so it
+#     cannot be IMAGE_INSTALL'd; it links statically into apps that need it.
+# Keeping these SDK-only leaves the flashed image lean.
 TOOLCHAIN_TARGET_TASK:append = " \
     libopencv-datasets-dev \
     libopencv-dpm-dev \
@@ -56,6 +60,8 @@ TOOLCHAIN_TARGET_TASK:append = " \
     libopencv-ts-dev \
     libopencv-videostab-dev \
     libopencv-xobjdetect-dev \
+    serial-dev \
+    serial-staticdev \
 "
 
 inherit extrausers
