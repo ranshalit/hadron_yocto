@@ -67,6 +67,9 @@ add_executable(hello main.cpp)
 int main() { std::cout << "Hello from Hadron!" << std::endl; }
 ```
 
+A ready-to-build copy of this example lives in
+[`examples/cmake-hello/`](examples/cmake-hello/).
+
 Verify the output is a Jetson (AArch64) binary, then copy it to the device and run:
 
 ```bash
