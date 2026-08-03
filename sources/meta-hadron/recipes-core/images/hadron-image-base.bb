@@ -37,6 +37,10 @@ IMAGE_INSTALL:append = " \
 
 IMAGE_FEATURES:append = " ssh-server-openssh"
 
+# Bundle cmake/ninja into the host SDK (populate_sdk) so cross-building cmake
+# apps on the host does not depend on the host's own cmake version.
+TOOLCHAIN_HOST_TASK:append = " nativesdk-cmake nativesdk-ninja"
+
 inherit extrausers
 
 # SHA-512 crypt hash of 'ubuntu'. Regenerate with: openssl passwd -6 ubuntu
