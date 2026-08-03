@@ -14,3 +14,11 @@ DEPENDS:remove = " \
 
 # Also ensure the cuda/dnn PackageConfig features are off
 PACKAGECONFIG:remove = "cuda dnn"
+
+# Disable the sfm (structure-from-motion) contrib module. It bundles the libmv
+# 3rdparty static libs (correspondence/multiview/numeric), which meta-oe builds
+# but never installs/packages. OpenCVModules.cmake still imports them, so
+# find_package(OpenCV) aborts with 'imported target correspondence references a
+# file that does not exist'. Nothing in this BSP uses sfm, so turn it off to
+# keep find_package(OpenCV) usable from the SDK.
+EXTRA_OECMAKE:append = " -DBUILD_opencv_sfm=OFF"
