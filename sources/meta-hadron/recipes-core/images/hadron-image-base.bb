@@ -29,7 +29,6 @@ IMAGE_INSTALL:append = " \
     python3-pymavlink \
     python3-v4l2py \
     wasp-version \
-    hadron-serial-switch \
     ffmpeg \
     docker-moby \
     nvidia-container-toolkit \
