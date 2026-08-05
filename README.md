@@ -133,3 +133,15 @@ cat /sys/bus/iio/devices/iio:device0/name          # → bmi160
 cat /sys/bus/iio/devices/iio:device0/in_accel_x_raw
 cat /sys/bus/iio/devices/iio:device0/in_anglvel_x_raw
 ```
+
+## Yocto vs. Ubuntu (lsmod comparison)
+
+The Yocto image shows a different set of modules in `lsmod` compared to the standard 
+Ubuntu distribution for the same Jetson hardware. This is expected: while many 
+drivers (like `nvgpu`, `nvmap`, and `tegra_drm`) are present as modules in both 
+environments, the specific kernel build configuration in Yocto may influence 
+which drivers are loaded as modules versus built directly into the kernel image.
+
+If you encounter issues with specific hardware functionality, please check the 
+system logs (`dmesg`) to verify the driver status.
+
