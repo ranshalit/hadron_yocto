@@ -33,9 +33,12 @@ IMAGE_INSTALL:append = " \
     docker-moby \
     nvidia-container-toolkit \
     libwebp \
+    gdbserver \
 "
 
-IMAGE_FEATURES:append = " ssh-server-openssh"
+IMAGE_FEATURES:append = " ssh-server-openssh dbg-pkgs"
+# Include debug packages and source files in the SDK
+SDKIMAGE_FEATURES += "dbg-pkgs src-pkgs"
 
 # Bundle cmake/ninja into the host SDK (populate_sdk) so cross-building cmake
 # apps on the host does not depend on the host's own cmake version.
