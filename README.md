@@ -145,3 +145,98 @@ which drivers are loaded as modules versus built directly into the kernel image.
 If you encounter issues with specific hardware functionality, please check the 
 system logs (`dmesg`) to verify the driver status.
 
+
+# gdb
+To configure host GDB to locate your SDKbs unstripped binaries, shared library debug symbols, and source code, you use **three core GDB configurations**: `sysroot`, `file`, and `substitute-path` (or `directory`).
+
+When you source the SDK environment script (`source environment-setup-...`), Yocto sets the `$SDKTARGETSYSROOT` environment variable for you.
+
+---
+
+### Step-by-step GDB Configuration
+
+#### 1. Point GDB to the SDK Sysroot (for Libraries & `.debug` symbols)
+
+By setting the sysroot, GDB automatically knows where to find all target shared libraries (`.so`) and their debug symbols (`usr/lib/debug/` inside the sysroot).
+
+In GDB:
+
+```gdb
+(gdb) set sysroot /path/to/sdk/sysroots/aarch64-poky-linux
+
+```
+
+*(Or inside the sourced terminal shell, you can use the variable: `(gdb) set sysroot $SDKTARGETSYSROOT`)*
+
+#### 2. Load the Unstripped Application Binary
+
+Always load the unstripped version of your own application binary into host GDB.
+
+* **Option A:** Launch GDB with the file path:
+```bash
+$GDB /path/to/your/unstripped_app
+
+```
+
+
+* **Option B:** Load it inside GDB:
+```gdb
+(gdb) file /path/to/your/unstripped_app
+
+```
+
+
+
+#### 3. Map Source Code Paths (for stepping through lines)
+
+GDB reads absolute source file paths embedded in the binary's debug symbols during compilation (e.g., `/usr/src/debug/...` or build directory paths). You need to tell GDB where those source files actually live on your host machine.
+
+* **For System/SDK Libraries (if installed via `src-pkgs`):**
+Map the build-time source path to the SDK sysroot source path:
+```gdb
+(gdb) set substitute-path /usr/src/debug /path/to/sdk/sysroots/aarch64-poky-linux/usr/src/debug
+
+```
+
+
+* **For Your Own Application Source Code:**
+If the source code is in a local directory on your host:
+```gdb
+(gdb) directory /path/to/your/local/app/source_code
+
+```
+
+
+
+---
+
+### Complete Automation Example (`gdb.setup` script)
+
+Instead of typing these commands every session, create a command script (e.g., `gdb.setup`) in your project root:
+
+```gdb
+# gdb.setup
+
+# 1. Set sysroot to SDK sysroot (GDB resolves $SDKTARGETSYSROOT from shell)
+set sysroot /opt/poky/sdk/sysroots/aarch64-poky-linux
+
+# 2. Map system source paths
+set substitute-path /usr/src/debug /opt/poky/sdk/sysroots/aarch64-poky-linux/usr/src/debug
+
+# 3. Add local source paths
+directory ./src
+
+# 4. Connect to gdbserver on the target board
+target remote 192.168.1.100:1234
+
+```
+
+Then run it in a single command on your host terminal:
+
+```bash
+source /opt/poky/sdk/environment-setup-aarch64-poky-linux
+$GDB -x gdb.setup /path/to/unstripped_app
+
+```
+
+Once connected, type `c` (continue) in GDB to start debugging.
