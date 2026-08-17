@@ -1,0 +1,5 @@
+# Disable runtime PM on the Tegra xHCI controller (3610000.usb).
+# It ELPG runtime-suspends when idle; a connect on the OTG port (usb2-0) does not
+# wake it, so devices hotplugged on that port are never enumerated. Keeping the
+# controller powered makes both USB ports detect devices (matches CTI/Ubuntu behavior).
+ACTION=="add", SUBSYSTEM=="platform", KERNEL=="3610000.usb", RUN+="/usr/sbin/hadron-usb-otg-keepon.sh"

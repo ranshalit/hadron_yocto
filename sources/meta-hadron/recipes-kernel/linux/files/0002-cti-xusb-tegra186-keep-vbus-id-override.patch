@@ -1,0 +1,25 @@
+From: Hadron BSP <support@connecttech.com>
+Subject: [PATCH] phy: tegra: xusb-tegra186: do not reset VBUS/ID override to floating
+
+NVIDIA's UTMI enable path resets the USB2_VBUS_ID VBUS/ID override to
+floating, clobbering the override programmed from the USB role switch on
+the Hadron OTG port. Drop that reset so the host-mode VBUS/ID override set
+elsewhere sticks (Tegra234/Orin uses this driver).
+
+Upstreamed from CTI L4T 36.4.4-V005 kernel source (in-tree delta).
+--- a/drivers/phy/tegra/xusb-tegra186.c	2025-07-01 13:48:42.000000000 +0300
++++ b/drivers/phy/tegra/xusb-tegra186.c	2025-12-23 21:22:11.000000000 +0200
+@@ -980,13 +980,6 @@
+ 		return -ENODEV;
+ 	}
+ 
+-	/* reset VBUS&ID OVERRIDE */
+-	reg = padctl_readl(padctl, USB2_VBUS_ID);
+-	reg &= ~VBUS_OVERRIDE;
+-	reg &= ~ID_OVERRIDE(~0);
+-	reg |= ID_OVERRIDE_FLOATING;
+-	padctl_writel(padctl, reg, USB2_VBUS_ID);
+-
+ 	if (port->supply && port->mode == USB_DR_MODE_HOST) {
+ 		err = regulator_enable(port->supply);
+ 		if (err) {

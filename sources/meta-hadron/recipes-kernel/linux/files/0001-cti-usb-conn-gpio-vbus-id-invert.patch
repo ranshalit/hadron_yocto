@@ -1,0 +1,93 @@
+From: Hadron BSP <support@connecttech.com>
+Subject: [PATCH] usb: conn-gpio: honor cti,vbus-invert/cti,id-invert on Hadron
+
+ConnectTech Hadron carrier wires the OTG (usb2-0) connector VBUS/ID sense
+GPIOs with inverted polarity. Parse the cti,vbus-invert / cti,id-invert
+device-tree properties and invert the read values accordingly, and add a
+short settle delay so the Tegra main GPIO reads a valid level at boot.
+
+Without this, the OTG port role is detected with wrong polarity, VBUS is
+never enabled in host mode, and no device enumerates on that port.
+
+Upstreamed from CTI L4T 36.4.4-V005 kernel source (in-tree delta).
+--- a/drivers/usb/common/usb-conn-gpio.c	2025-07-01 13:48:42.000000000 +0300
++++ b/drivers/usb/common/usb-conn-gpio.c	2025-12-23 21:22:11.000000000 +0200
+@@ -20,9 +20,11 @@
+ #include <linux/power_supply.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/usb/role.h>
++#include <linux/delay.h>
+ 
+ #define USB_GPIO_DEB_MS		20	/* ms */
+ #define USB_GPIO_DEB_US		((USB_GPIO_DEB_MS) * 1000)	/* us */
++#define ORIN_NX_GPIO_DELAY_US 10000 //Added to solve reading of invalid value from tegra_main_gpio at bootup
+ 
+ #define USB_CONN_IRQF	\
+ 	(IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT)
+@@ -37,8 +39,11 @@
+ 
+ 	struct gpio_desc *id_gpiod;
+ 	struct gpio_desc *vbus_gpiod;
++	bool vbus_invert;
++	bool id_invert;
+ 	int id_irq;
+ 	int vbus_irq;
++	int init_delay_us; //delay for gpios
+ 
+ 	struct power_supply_desc desc;
+ 	struct power_supply *charger;
+@@ -71,11 +76,21 @@
+ 	info = container_of(to_delayed_work(work),
+ 			    struct usb_conn_info, dw_det);
+ 
++	//delay for ORIN-NX fix (Tegra-main-gpio takes time to go up).
++        info->init_delay_us=ORIN_NX_GPIO_DELAY_US;
++        udelay(info->init_delay_us);
++
+ 	/* check ID and VBUS */
+ 	id = info->id_gpiod ?
+ 		gpiod_get_value_cansleep(info->id_gpiod) : 1;
+-	vbus = info->vbus_gpiod ?
++	vbus = info->vbus_gpiod ? 	//could be an issue with the invert
+ 		gpiod_get_value_cansleep(info->vbus_gpiod) : id;
++	dev_dbg(info->dev, "initial read gpios: id %d, vbus %d\n", id, vbus);
++	if(info->id_invert)
++		id = (id ? 0 : 1);
++	if(info->vbus_invert)
++		vbus = (vbus ? 0 : 1);
++
+ 
+ 	if (!id)
+ 		role = USB_ROLE_HOST;
+@@ -84,7 +99,7 @@
+ 	else
+ 		role = USB_ROLE_NONE;
+ 
+-	dev_dbg(info->dev, "role %s -> %s, gpios: id %d, vbus %d\n",
++	dev_info(info->dev, "role %s -> %s, gpios: id %d, vbus %d\n",
+ 		usb_role_string(info->last_role), usb_role_string(role), id, vbus);
+ 
+ 	if (!info->initial_detection && info->last_role == role) {
+@@ -190,10 +205,22 @@
+ 	if (IS_ERR(info->id_gpiod))
+ 		return PTR_ERR(info->id_gpiod);
+ 
++	if (of_property_read_bool(dev->of_node, "cti,vbus-invert"))
++	{
++		dev_dbg(dev, "vbus is inverted\n");
++		info->vbus_invert = 1;	
++	}
++
+ 	info->vbus_gpiod = devm_gpiod_get_optional(dev, "vbus", GPIOD_IN);
+ 	if (IS_ERR(info->vbus_gpiod))
+ 		return PTR_ERR(info->vbus_gpiod);
+ 
++	if (of_property_read_bool(dev->of_node, "cti,id-invert"))
++	{
++		dev_dbg(dev, "id is inverted\n");
++		info->id_invert = 1;	
++	}
++
+ 	if (!info->id_gpiod && !info->vbus_gpiod) {
+ 		dev_err(dev, "failed to get gpios\n");
+ 		return -ENODEV;
