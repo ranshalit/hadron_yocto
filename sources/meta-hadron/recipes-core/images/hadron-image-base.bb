@@ -96,5 +96,5 @@ setup_sbin_path() {
 # Append the image build timestamp as the second line of /etc/wasp/version/version.txt.
 # Runs every do_rootfs so the date always reflects the actual image build time.
 stamp_wasp_version() {
-    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${IMAGE_ROOTFS}${sysconfdir}/wasp/version/version.txt
+    echo "$(date -u +"%Y-%m-%d %H:%M:%S")" >> ${IMAGE_ROOTFS}${sysconfdir}/wasp/version/version.txt
 }
