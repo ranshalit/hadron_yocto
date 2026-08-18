@@ -10,6 +10,7 @@ IMAGE_INSTALL:append = " \
     hadron-usb-otg \
     kernel-module-bmi160-core \
     kernel-module-bmi160-i2c \
+    kernel-module-uvcvideo \
     bmi160-config \
     iproute2 \
     net-tools \
