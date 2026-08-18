@@ -1,0 +1,4 @@
+# Stable /dev/ttyCAM symlink for the UART camera (USB vendor 5353).
+# NOTE: a plain KERNEL=="ttyUSB*" match (no vendor) was removed: it grabbed
+# every USB-serial adapter and symlinked it to ttyCAM. Match by vendor only.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="5353", SYMLINK+="ttyCAM"

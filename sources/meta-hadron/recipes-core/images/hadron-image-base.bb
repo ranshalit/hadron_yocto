@@ -8,6 +8,7 @@ DESCRIPTION = "Minimal base image for the ConnectTech Hadron NGX012 (Jetson Orin
 IMAGE_INSTALL:append = " \
     hadron-network \
     hadron-usb-otg \
+    hadron-serial-symlinks \
     kernel-module-bmi160-core \
     kernel-module-bmi160-i2c \
     kernel-module-uvcvideo \

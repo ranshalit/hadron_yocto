@@ -1,0 +1,3 @@
+# Stable /dev/ttyPixHawk symlink for the CubePilot Orange Cube (2dae:1058)
+# flight controller. Interface 00 is the MAVLink telemetry/console ACM port.
+KERNEL=="ttyACM*", ATTRS{idVendor}=="2dae", ATTRS{idProduct}=="1058", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="ttyPixHawk"
