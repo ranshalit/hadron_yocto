@@ -79,7 +79,7 @@ inherit extrausers
 UBUNTU_PASSWD = "\$6\$f/BmnEoofLFK53F3\$7ZIR6XHL5SjDszGcFaaX5FY0lGEjsMtJf3x7y.rl3f4meKmcLnPtgoFRp6xwdgFRQZZYnLmX674/PrG93EOvQ/"
 
 EXTRA_USERS_PARAMS = "\
-    useradd -m -s /bin/bash -G sudo ubuntu; \
+    useradd -m -s /bin/bash -G sudo,video,dialout ubuntu; \
     usermod -p '${UBUNTU_PASSWD}' ubuntu; \
 "
 
