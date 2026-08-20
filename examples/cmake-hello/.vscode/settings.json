@@ -1,0 +1,7 @@
+{
+  "hadron.sdkRoot": "/opt/poky/5.0.17",
+  "hadron.deviceIp": "192.168.132.100",
+  "hadron.deviceUser": "ubuntu",
+  "hadron.devicePassword": "ubuntu",
+  "hadron.appBinary": "hello"
+}

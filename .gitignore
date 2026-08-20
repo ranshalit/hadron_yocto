@@ -20,3 +20,5 @@ meta-tegra/
 __pycache__/
 *.pyc
 build.pid
+.aider*
+.env

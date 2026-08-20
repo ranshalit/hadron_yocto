@@ -7,6 +7,7 @@ built with meta-tegra on Yocto Scarthgap / L4T R36.4.4 (JetPack 6.2.1).
 
 ```bash
 kas build kas.yml
+kas build kas.yml --target hadron-image-desktop
 ```
 
 See also: https://connecttech.com/resource-center/l4t-board-support-packages/
@@ -39,7 +40,7 @@ copy the `.sh` over (e.g. `scp …toolchain-5.0.17.sh host:`), then run it:
 
 ```bash
 ./poky-glibc-x86_64-hadron-image-base-armv8a-hadron-ngx012-toolchain-5.0.17.sh \
-    -y -d /opt/hadron-sdk
+    -y -d /opt/poky/5.0.17
 ```
 
 `-y` accepts defaults, `-d` sets the install directory (default `/opt/poky/5.0.17`).
@@ -162,11 +163,16 @@ By setting the sysroot, GDB automatically knows where to find all target shared 
 In GDB:
 
 ```gdb
-(gdb) set sysroot /path/to/sdk/sysroots/aarch64-poky-linux
+(gdb) set sysroot /opt/poky/5.0.17/sysroots/armv8a-poky-linux
 
 ```
 
-*(Or inside the sourced terminal shell, you can use the variable: `(gdb) set sysroot $SDKTARGETSYSROOT`)*
+*(Or, after sourcing the SDK env script, just use the variable: `(gdb) set sysroot $SDKTARGETSYSROOT`)*
+
+The SDK sysroot ships split debug symbols for the OS libraries under
+`$SDKTARGETSYSROOT/usr/lib/.debug/` (e.g. `libc.so.6`, `libstdc++.so.6.0.32`) and their
+source under `$SDKTARGETSYSROOT/usr/src/debug/` (`glibc`, `gcc-runtime`). With `sysroot`
+set, GDB auto-loads these — you can `bt`/`step` straight into libc/libstdc++.
 
 #### 2. Load the Unstripped Application Binary
 
@@ -194,7 +200,7 @@ GDB reads absolute source file paths embedded in the binary's debug symbols duri
 * **For System/SDK Libraries (if installed via `src-pkgs`):**
 Map the build-time source path to the SDK sysroot source path:
 ```gdb
-(gdb) set substitute-path /usr/src/debug /path/to/sdk/sysroots/aarch64-poky-linux/usr/src/debug
+(gdb) set substitute-path /usr/src/debug /opt/poky/5.0.17/sysroots/armv8a-poky-linux/usr/src/debug
 
 ```
 
@@ -217,11 +223,12 @@ Instead of typing these commands every session, create a command script (e.g., `
 ```gdb
 # gdb.setup
 
-# 1. Set sysroot to SDK sysroot (GDB resolves $SDKTARGETSYSROOT from shell)
-set sysroot /opt/poky/sdk/sysroots/aarch64-poky-linux
+# 1. Set sysroot to SDK sysroot (GDB resolves $SDKTARGETSYSROOT from shell).
+#    This alone gives OS-library debug: libc/libstdc++ .debug symbols load automatically.
+set sysroot /opt/poky/5.0.17/sysroots/armv8a-poky-linux
 
-# 2. Map system source paths
-set substitute-path /usr/src/debug /opt/poky/sdk/sysroots/aarch64-poky-linux/usr/src/debug
+# 2. Map system/OS-library source paths (glibc, gcc-runtime, ...)
+set substitute-path /usr/src/debug /opt/poky/5.0.17/sysroots/armv8a-poky-linux/usr/src/debug
 
 # 3. Add local source paths
 directory ./src
@@ -234,9 +241,46 @@ target remote 192.168.1.100:1234
 Then run it in a single command on your host terminal:
 
 ```bash
-source /opt/poky/sdk/environment-setup-aarch64-poky-linux
+source /opt/poky/5.0.17/environment-setup-armv8a-poky-linux
 $GDB -x gdb.setup /path/to/unstripped_app
 
 ```
 
 Once connected, type `c` (continue) in GDB to start debugging.
+
+### Verifying OS library debug works
+
+To confirm GDB can debug into the OS libraries (not just your app), use the `cmake-hello`
+example (its `std::cout` calls live in `libstdc++`):
+
+```gdb
+(gdb) set sysroot /opt/poky/5.0.17/sysroots/armv8a-poky-linux
+(gdb) nosharedlibrary
+(gdb) sharedlibrary
+(gdb) info sharedlibrary                       # libc/libstdc++ -> "Syms Read: Yes"
+(gdb) break std::basic_ostream<char>::operator<<
+(gdb) c
+(gdb) bt                                        # frames show libstdc++ file:line, not ??
+(gdb) step                                      # steps into libstdc++ source lines
+```
+
+If `bt` shows named `std::...`/glibc frames **with source file and line numbers**, OS
+library debug is working.
+
+# validation
+run scripts/hadron-selftest.py
+
+
+# flash 
+using initrd_flash from tegraflash zip
+
+also another alternative:
+   L4T=/media/ranshal/jetson/L4T/JetPack_6.2.1_Linux_JETSON_ORIN_NANO_TARGETS/Linux_for ┃
+   _Tegra                                                                               ┃
+   cd $L4T                                                                              ┃
+   sudo ./tools/kernel_flash/l4t_initrd_flash.sh \                                      ┃
+     --external-device nvme0n1p1 \                                                      ┃
+     -c tools/kernel_flash/flash_l4t_external.xml \                                     ┃
+     -p "-c bootloader/generic/cfg/flash_t234_qspi.xml" \                               ┃
+     --showlogs --network usb0 --no-flash \                                             ┃
+     cti/orin-nano/hadron/base internal      

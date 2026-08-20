@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build (SDK)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "source ${config:hadron.sdkRoot}/environment-setup-armv8a-poky-linux && cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug && cmake --build build"
+      ],
+      "problemMatcher": ["$gcc"],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "deploy-and-start-gdbserver",
+      "detail": "Copy the unstripped binary to the device and start gdbserver on :1234",
+      "type": "shell",
+      "dependsOn": "build (SDK)",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/.vscode/deploy-gdbserver.sh",
+        "${config:hadron.deviceIp}",
+        "${config:hadron.deviceUser}",
+        "${config:hadron.devicePassword}",
+        "1234",
+        "${config:hadron.appBinary}"
+      ],
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": { "regexp": "." },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^==> Copying",
+          "endsPattern": "Listening on port 1234"
+        }
+      }
+    }
+  ]
+}

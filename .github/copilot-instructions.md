@@ -20,10 +20,6 @@ Use the CTI L4T BSP's `l4t_initrd_flash.sh --network usb0` mechanism, injecting 
 partition images from the Yocto `tegraflash.tar.gz`. This uses USB Ethernet + SSH to write
 partitions from inside a running recovery Linux — it reliably detects NVMe.
 
-> ⚠️ **Do NOT use Yocto's built-in `initrd-flash`** (USB mass-storage). It fails on this
-> board because `/dev/nvme0n1` never appears within the 15-second device-side timeout in
-> meta-tegra's recovery initrd.
-
 ### Prerequisites
 
 ```bash
@@ -173,15 +169,6 @@ UBUNTU_PASSWD = "\$6\$salt\$hash..."
 string. Bare `$6`, `$f`, `$7...` get shell-expanded to empty, corrupting the hash.
 BitBake preserves the backslash; the shell then interprets `\$` as literal `$`.
 To regenerate: `openssl passwd -6 ubuntu` — then escape every `$` as `\$` in the recipe.
-
----
-
-## Why `--network usb0` Works (and `initrd-flash` Doesn't)
-
-| Method | Mechanism | NVMe detection | Result |
-|---|---|---|---|
-| Yocto `initrd-flash` | USB mass-storage gadget; host writes to NVMe exposed as USB disk | Device-side 15s timeout; `/dev/nvme0n1` never appears | **FAILS** |
-| CTI `--network usb0` | USB Ethernet (RNDIS/ECM); host SSHes to 192.168.55.1 and writes NVMe from inside running Linux | NVMe detected normally by recovery kernel | **WORKS** |
 
 ---
 
