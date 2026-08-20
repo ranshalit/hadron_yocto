@@ -159,6 +159,34 @@ idea-source** for boot optimization and should be consulted for candidates
 
 ---
 
+## 5a. Rejected / Deferred Alternatives
+
+### Switching to busybox init (`INIT_MANAGER = "mdev-busybox"`) — REJECTED
+
+Lumen uses busybox init and reaches ~6s, so it's a natural question. Rejected
+for Hadron for this goal:
+
+- **Off the ICMP critical path.** Boot-to-ICMP is bounded by kernel + NIC driver
+  + IP assignment, not PID 1. The biggest ICMP lever here — the `ip=` kernel
+  cmdline — answers ping **before init runs at all**, so a lighter init barely
+  moves the metric. Lumen's own `boot-optimize.md` states init deferral yields a
+  *faster prompt*, **not** faster time-to-network-ready.
+- **Breaks required payload.** docker-moby + nvidia-container-toolkit (required)
+  depend on systemd in practice (cgroup/unit management); `10-eth0.network` uses
+  systemd-networkd; the desktop image (XFCE/logind) expects systemd. All would
+  need hand-rewritten init scripts.
+- **Not isolable.** `INIT_MANAGER` is a whole-distro setting — it cannot be
+  scoped to only `hadron-image-fastboot` without forking the distro. Violates
+  the "base + desktop stay functional" constraint.
+
+**Conclusion:** high cost, low ICMP payoff. Pursue the near-free
+bootloader/kernel/`ip=` wins first and measure. Revisit busybox only if
+measurement proves the ICMP floor is dominated by **systemd userspace on the
+critical path** — and even then only for a stripped fastboot image, never base
+or desktop.
+
+---
+
 ## 6. Success Criteria
 
 - A reproducible **median power-on → ICMP** number, measurably lower than the
