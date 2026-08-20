@@ -37,6 +37,7 @@ IMAGE_INSTALL:append = " \
     nvidia-container-toolkit \
     libwebp \
     gdbserver \
+    systemd-analyze \
 "
 
 IMAGE_FEATURES:append = " ssh-server-openssh dbg-pkgs"
