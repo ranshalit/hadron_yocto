@@ -3,7 +3,12 @@
 **Date:** 2026-08-20
 **Branch:** `fastboot_opt`
 **Machine:** `hadron-ngx012` (Jetson Orin Nano 4GB, p3767-0003, ConnectTech Hadron NGX012)
-**Status:** Design approved — pending implementation plan
+**Status:** Design approved — implementation in progress on `fastboot_opt`
+
+> **Methodology note (2026-08-23):** switched from measurement-driven
+> (flash→measure→keep/revert) to **apply-and-commit** — optimizations are landed as
+> commits and build-verified, with on-hardware boot timing deferred to a later pass.
+> See the plan's "Status" and "Deferred / needs-HW-validation" sections.
 
 ---
 

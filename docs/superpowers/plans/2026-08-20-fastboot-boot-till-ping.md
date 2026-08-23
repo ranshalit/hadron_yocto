@@ -2,22 +2,33 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Reduce power-on → first ICMP ping reply on `192.168.132.100` (eth0) for the Hadron NGX012, via universal bootloader/kernel/DTB wins in the base image plus a dedicated `hadron-image-fastboot` image, every change verified on real hardware.
+**Goal:** Reduce power-on → first ICMP ping reply on `192.168.132.100` (eth0) for the Hadron NGX012, via universal bootloader/kernel/DTB wins in the base image plus a dedicated `hadron-image-fastboot` image.
 
-**Architecture:** Measurement-driven, phased. A host harness power-cycles the board (zup PSU) and times power-on→ICMP; each optimization is applied, rebuilt, flashed, re-measured, then kept or reverted based on the measured median. Universal wins land in the machine conf / base image; aggressive payload stripping lands in a new fastboot image recipe.
+> **METHODOLOGY CHANGE (2026-08-23):** This effort was originally measurement-driven
+> (flash → measure median → keep/revert per change). Per the maintainer's request we
+> switched to **apply-and-commit**: each optimization is implemented as a commit on
+> `fastboot_opt` and validated only by **building** (recipe/config sanity), *without*
+> power-on→ping timing on hardware. On-hardware boot-time validation is **deferred**
+> to a later pass — see the "Deferred / needs-HW-validation" section at the end.
+> Changes that would need on-HW recon (which DTB nodes are unused, the exact
+> meta-tegra MB1/BPMP log knob) or brick-risky source work (building the out-of-tree
+> r8168 NIC in) are **not committed as speculative config**; they are documented as
+> deferred with their concrete blockers.
 
-**Tech Stack:** Yocto (scarthgap), kas, meta-tegra, meta-hadron, systemd, TDK-Lambda ZUP PSU (zup-power-supply skill), CTI L4T initrd flash.
+**Architecture:** Phased. Universal, low-risk wins land in the machine conf / base image (benefit base + desktop + fastboot); aggressive payload stripping lands in a new `hadron-image-fastboot` recipe. Each change is one commit. Build-verify each; defer boot timing.
+
+**Tech Stack:** Yocto (scarthgap), kas, meta-tegra, meta-hadron, systemd, TDK-Lambda ZUP PSU (zup-power-supply skill), CTI L4T initrd flash / eth-initrd-flash.
 
 ## Global Constraints
 
 - Machine: `hadron-ngx012` (Jetson Orin Nano 4GB, p3767-0003). Rootfs always on `nvme0n1p1`.
-- Metric = **median power-on → first ICMP reply** on `192.168.132.100`, host-side, N≥5 runs.
-- `hadron-image-base` AND `hadron-image-desktop` MUST remain bootable and functional. Only universal (risk-free) wins touch them; aggressive stripping is fastboot-image-only.
+- Metric (deferred validation) = **median power-on → first ICMP reply** on `192.168.132.100`. Under the apply-and-commit methodology this is NOT measured per-change; it is a later HW pass.
+- `hadron-image-base` AND `hadron-image-desktop` MUST remain bootable and functional. Only universal (low-risk) wins touch them; aggressive stripping is fastboot-image-only.
 - Required payload in fastboot image (must be present, may start AFTER ping): `docker-moby`, `nvidia-container-toolkit`, `ffmpeg`, `pymavlink`, `wasp-version`, `hadron-network`, sshd, `hadron-serial-symlinks`, `bmi160-config`. NOT required: CUDA stack, opencv, full gstreamer plugin set.
 - Init system stays **systemd** (busybox rejected — see spec §5a).
-- Kernel defconfig changes ARE permitted where measured to help.
+- Kernel defconfig changes ARE permitted where in-tree and correct (NVMe/PCIe/PHY). Out-of-tree drivers (r8168 NIC) cannot be forced `=y` via a fragment.
 - Build: `kas build kas.yml` (default target base); fastboot built by overriding target.
-- One git commit per experiment on branch `fastboot_opt` for easy revert.
+- **One git commit per optimization** on branch `fastboot_opt` for easy revert. Build-verify only; no per-change boot timing.
 - Static eth0 config lives in `sources/meta-hadron/recipes-connectivity/hadron-network/files/10-eth0.network` (systemd-networkd). Current kernel args: `net.ifnames=0` + `console=ttyTHS1,115200 console=tty0` in `sources/meta-hadron/conf/machine/hadron-ngx012.conf`.
 - Flash procedure: per repo `.github/copilot-instructions.md` (CTI `l4t_initrd_flash.sh --network usb0`, inject Yocto `tegraflash.tar.gz`). Board must be in USB recovery mode.
 - Design spec: `docs/superpowers/specs/2026-08-20-fastboot-boot-till-ping-design.md`.
@@ -741,7 +752,61 @@ git commit -m "docs(fastboot): record boot-till-ping results and fastboot build 
 
 ---
 
-## Self-Review Notes
+## Status (2026-08-23, apply-and-commit pass)
+
+| Task | Change | State |
+|---|---|---|
+| 3 | extlinux `TIMEOUT 0` | **DONE** — `machine.conf` (`UBOOT_EXTLINUX_TIMEOUT="0"`) |
+| 4 | quiet kernel cmdline | **DONE** — `machine.conf` (`quiet loglevel=0`, THS1 console restored) |
+| 8 | `hadron-image-fastboot` recipe | **DONE** — strips opencv/gstreamer/v4l2py + dbg-pkgs |
+| 9 (in-tree part) | NVMe/PCIe/PHY `=y` | **DONE** — `fastboot.cfg` groundwork (unblocks Task 5) |
+| 5 | no-initramfs | **DEFERRED** — needs Task 9 built-in verified booting on HW; machine-global so must not break base/desktop |
+| 6 | MB1/BPMP log silence | **DEFERRED** — meta-tegra not in-tree here; real knob must be read from the pinned layer + QSPI reflash |
+| 7 | disable unused DTB nodes | **DEFERRED** — needs on-HW peripheral recon to know which nodes are truly unused |
+| 9 (NIC part) / 10 | built-in NIC + `ip=` early eth0 | **DEFERRED** — eth0 uses the OUT-OF-TREE r8168 module; needs kernel-tree patch or r8169 swap + HW validation |
+| 11 | results report | **DEFERRED** — depends on the deferred HW timing pass |
+
+Also done this pass: removed measurement-only `systemd-analyze` from the base image;
+the earlier console→TCU0 revert (measurement-only) is superseded by the restored
+THS1 console in Task 4.
+
+## Deferred / needs-HW-validation
+
+These are intentionally NOT committed as speculative config because doing so blind
+would be wrong (incorrect NIC symbol), unrecoverable-risky, or unknowable without
+the board. Concrete blockers and next actions:
+
+1. **Task 5 — drop `tegra-minimal-initramfs`.** Prereq: confirm the Task 9
+   `fastboot.cfg` actually makes `CONFIG_BLK_DEV_NVME`/`CONFIG_PCIE_TEGRA194`/
+   `CONFIG_PHY_TEGRA194_P2U` `=y` in the built `.config` AND that the board mounts
+   `root=/dev/nvme0n1p1` directly. Then add to `machine.conf`:
+   `INITRAMFS_IMAGE = ""` + `INITRAMFS_IMAGE_BUNDLE = "0"`. Because this is
+   machine-global it changes base + desktop too — validate all three still boot
+   before keeping.
+2. **Task 6 — MB1/BPMP serial-log silence.** meta-tegra is fetched by kas outside
+   this tree, so the real variable/BCT knob can't be grepped statically here.
+   At execution: `grep -rniE "MB1_LOG|LOG_LEVEL|BPMP.*(LOG|UART)" <kas meta-tegra path>`,
+   or add a BCT `.dts` override wired via a `TEGRA_FLASHVAR_*` (mirrors the existing
+   MB2-BCT override). Touches QSPI → needs a full flash, not kernel-only.
+3. **Task 7 — disable unused DTB nodes.** The DTB
+   (`sources/meta-hadron/recipes-bsp/cti-board-support/files/tegra234-orin-nano-cti-NGX012.dtb`)
+   is decompilable now, but deciding a node is "unused" needs on-HW enumeration
+   (`lspci`, `aconnect -l`, populated SPI buses). Only disable provably-empty nodes;
+   never touch eth0/NVMe/camera/sensor nodes.
+4. **Task 9 (NIC) + Task 10 — built-in NIC + `ip=` early eth0.** eth0 is the
+   out-of-tree Realtek **r8168** (`nvidia-kernel-oot: nv-kernel-module-r8168`), so it
+   cannot be `=y` via a Kconfig fragment. Options: (a) patch r8168 into the kernel
+   source tree, or (b) switch to in-kernel `CONFIG_R8169=y` (verify it binds the
+   Hadron's RTL8168 correctly). Only after the NIC is built-in can the fastboot
+   image add `ip=192.168.132.100::192.168.132.1:255.255.255.0::eth0:off`. Both need
+   on-HW validation (link comes up, single non-flapping address, networkd takes over).
+
+The measurement harness (`scripts/boot-timing/`) and the single-cable grabserial
+attribution (`scripts/boot-timing/attribution-tcu0.md`) remain in the branch for
+that later HW timing pass.
+
+---
+
 
 - **Spec coverage:** Phase 0 harness → Tasks 1-2. Phase 1 universal wins → Tasks 3-7 (extlinux, quiet, no-initramfs, bootloader log, DTB). Phase 2 fastboot image → Tasks 8, 10. Phase 3 kernel defconfig → Task 9. Rejected busybox → documented in spec, no task (correct). Results/success-criteria → Task 11. All spec sections mapped.
 - **Ordering dependency:** Task 5 (no-initramfs) and Task 10 (`ip=`) require NVMe/NIC built-in; Task 9 supplies that. If Task 5/10 Step 1 finds `=m`, run Task 9 first. This is called out inline in each affected task.
