@@ -9,7 +9,7 @@ Non-interactive: runs once, prints a colored PASS/WARN/FAIL table (or --json),
 exits 0 (no FAIL), 1 (a FAIL), or 2 (device unreachable).
 
 Config comes from the environment then a .env in the current directory:
-  HADRON_IP, HADRON_SSH_USER, HADRON_SSH_PASS, HADRON_SSH_CONNECT_TIMEOUT
+  DEVICE_IP, DEVICE_SSH_USER, DEVICE_SSH_PASS, DEVICE_SSH_CONNECT_TIMEOUT
 CLI flags override: --ip --user --password --timeout --only --json
 """
 
@@ -76,16 +76,16 @@ def resolve_config(args):
         return default
 
     cfg = {
-        "ip": pick(args.ip, "HADRON_IP"),
-        "user": pick(args.user, "HADRON_SSH_USER"),
-        "password": pick(args.password, "HADRON_SSH_PASS"),
-        "connect_timeout": pick(None, "HADRON_SSH_CONNECT_TIMEOUT", "10"),
+        "ip": pick(args.ip, "DEVICE_IP"),
+        "user": pick(args.user, "DEVICE_SSH_USER"),
+        "password": pick(args.password, "DEVICE_SSH_PASS"),
+        "connect_timeout": pick(None, "DEVICE_SSH_CONNECT_TIMEOUT", "10"),
         "timeout": args.timeout,
     }
     missing = [k for k in ("ip", "user", "password") if not cfg[k]]
     if missing:
-        keymap = {"ip": "HADRON_IP", "user": "HADRON_SSH_USER",
-                  "password": "HADRON_SSH_PASS"}
+        keymap = {"ip": "DEVICE_IP", "user": "DEVICE_SSH_USER",
+                  "password": "DEVICE_SSH_PASS"}
         names = ", ".join(keymap[k] for k in missing)
         sys.exit(f"error: missing required config: {names} "
                  "(set in .env, environment, or via CLI flags)")
@@ -355,9 +355,9 @@ def render_json(cfg, results, exit_code):
 
 def main():
     ap = argparse.ArgumentParser(description="Hadron NGX012 interface self-test")
-    ap.add_argument("--ip", help="device IP (default: HADRON_IP)")
-    ap.add_argument("--user", help="SSH user (default: HADRON_SSH_USER)")
-    ap.add_argument("--password", help="SSH password (default: HADRON_SSH_PASS)")
+    ap.add_argument("--ip", help="device IP (default: DEVICE_IP)")
+    ap.add_argument("--user", help="SSH user (default: DEVICE_SSH_USER)")
+    ap.add_argument("--password", help="SSH password (default: DEVICE_SSH_PASS)")
     ap.add_argument("--timeout", type=int, default=20,
                     help="per-check timeout in seconds (default: 20)")
     ap.add_argument("--only", help="comma-separated subset of checks to run "
