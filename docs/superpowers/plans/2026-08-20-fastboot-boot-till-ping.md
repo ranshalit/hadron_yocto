@@ -805,6 +805,28 @@ The measurement harness (`scripts/boot-timing/`) and the single-cable grabserial
 attribution (`scripts/boot-timing/attribution-tcu0.md`) remain in the branch for
 that later HW timing pass.
 
+### Reference-repo cross-check (lumen, 2026-08-23)
+
+Cross-checked `/media/ranshal/jetson/lumen` git history (its boot-opt commits) for
+ideas not already covered. Lumen is **sysvinit**; hadron is **systemd**, so several
+lumen wins are init-system-specific and don't transfer. Findings:
+
+| Lumen commit / idea | Hadron applicability |
+|---|---|
+| `b257bd4` 120s freeze: `usb_role` udev rule stalled `udevadm settle` | **N/A** — hadron switches USB role **in-kernel** (`0001-cti-usb-conn-gpio-vbus-id-invert.patch`), no `usb_role` udev rule, no blocking coldplug worker. Landmine absent. |
+| `8521076` r8168→eth0 NAME= rename rule → link up 8s→150s | **N/A** — hadron uses `net.ifnames=0`; kernel already names the NIC `eth0` and networkd only `Match Name=eth0`. No harmful rename rule. |
+| `ae9fa57` bring eth0 up immediately (don't wait operstate) → −30s | **Already lean** — hadron uses **static IP** (`10-eth0.network`, no DHCP discovery), **no `systemd-networkd-wait-online`**, no ifup operstate-wait. Only micro-lever left is starting networkd earlier than `multi-user.target` (needs HW measurement). |
+| `c9a2eb4` narrow PHY autoneg to 100baseT/Full | **Skip** — lumen's own later A/B test (`ae9fa57`) found forcing fixed speed gave **no end-to-end benefit** (link up ~9–10s either way); autoneg wins for simplicity. Matches our attribution. |
+| `e5ee520`/`f8dac2b` nvgpu coldplug blacklist to skip ~3s probe | **Skip** — lumen **reverted** both (`70d79a1`,`f8dac2b`); the blacklist caused problems and the probe is off the critical path anyway. |
+| `bc65337` disable RTC sync at boot (~2.6s); `852177d` non-blocking docker/app | **N/A on boot-to-ping** — these are sysvinit rcS wins; on hadron's systemd these services are already parallel and off the ping path. |
+
+**Conclusion:** the reference repo surfaces **no new config-only big lever** for
+hadron. It instead (a) confirms the Deferred list above is the correct remaining
+set, and (b) **de-risks two dead-ends** (PHY force-speed, nvgpu blacklist). The
+genuinely large remaining lever stays the **pre-kernel firmware/UEFI ~67%** of the
+boot (no-initramfs Task 5 + UEFI/MB1 knobs Task 6), all of which need a serial
+cable and on-HW measurement.
+
 ---
 
 
