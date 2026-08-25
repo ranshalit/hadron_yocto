@@ -84,11 +84,12 @@ EXTRA_USERS_PARAMS = "\
 "
 
 # Yocto's default sudoers does not grant the sudo group access — add it explicitly.
+# NOPASSWD: members of the sudo group run sudo without a password prompt.
 # Also add /sbin:/usr/sbin to PATH for all users (Yocto only adds them for root).
 ROOTFS_POSTPROCESS_COMMAND:append = " setup_sudo_group; setup_sbin_path; stamp_wasp_version;"
 setup_sudo_group() {
     install -d ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d
-    echo '%sudo ALL=(ALL:ALL) ALL' > ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/sudo-group
+    echo '%sudo ALL=(ALL:ALL) NOPASSWD: ALL' > ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/sudo-group
     chmod 440 ${IMAGE_ROOTFS}${sysconfdir}/sudoers.d/sudo-group
 }
 setup_sbin_path() {
