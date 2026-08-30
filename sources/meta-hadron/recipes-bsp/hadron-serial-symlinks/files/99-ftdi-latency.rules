@@ -1,0 +1,3 @@
+# Reduce FTDI USB-serial latency_timer from the 16ms default to 1ms
+# for lower-latency serial I/O.
+ACTION=="add", SUBSYSTEM=="usb-serial", DRIVER=="ftdi_sio", ATTR{latency_timer}="1"
