@@ -284,3 +284,76 @@ also another alternative:
      -p "-c bootloader/generic/cfg/flash_t234_qspi.xml" \                               ┃
      --showlogs --network usb0 --no-flash \                                             ┃
      cti/orin-nano/hadron/base internal      
+
+---
+
+## Measuring USB Port Latency / RTT
+
+Utilities to verify a USB port meets a latency budget (e.g. **≤ 5 ms**) live in
+`scripts/usb-latency/`. Two complementary methods are used:
+
+| Method | Script | What it measures |
+|--------|--------|------------------|
+| **usbmon** (kernel URB timing) | `usbmon_latency.py` | Pure host/port service time. The bulk-**OUT** (`Bo`) submit→complete is the cleanest *one-way* USB latency. |
+| **Serial loopback RTT** (wall-clock) | `rtt_loopback.py` | End-to-end **round-trip** time through a USB-serial adapter with **TX↔RX shorted**. |
+
+> Why both: usbmon gives a clean one-way OUT number but **cannot** measure receive/round-trip
+> (a bulk-IN URB stays *pending* until data arrives, so its time includes device turnaround, not port latency).
+> The loopback RTT covers the round-trip that usbmon can't.
+
+### Prerequisites
+
+- A USB-to-serial adapter (FTDI / PL2303 / CDC MCU) plugged into the port under test.
+- For the RTT test: **short TX↔RX** on the adapter (DB9: jumper **pin 2 ↔ pin 3**; TTL header: TX pin ↔ RX pin).
+- `python3` + `pyserial` (`pip3 install pyserial`).
+
+### Step 0 — remove latency sources first (required, or results lie)
+
+```bash
+sudo nvpmodel -m 0 && sudo jetson_clocks                 # max clocks, no scaling jitter
+for f in /sys/bus/usb/devices/*/power/control; do echo on | sudo tee "$f"; done   # kill autosuspend
+for f in /sys/bus/usb/devices/*/power/usb3_lpm_permit; do echo 0 | sudo tee "$f"; done 2>/dev/null  # kill USB3 LPM
+# FTDI adapters only: drop the 16 ms latency timer
+echo 1 | sudo tee /sys/bus/usb-serial/devices/ttyUSB0/latency_timer 2>/dev/null
+```
+
+> These settings reset on reboot and apply only to devices present at the time.
+
+### Method A — usbmon (one-way, no loopback needed)
+
+```bash
+sudo modprobe usbmon
+lsusb -t                                                  # find the bus number of your device
+sudo timeout 12 cat /sys/kernel/debug/usb/usbmon/<BUS>u > /tmp/cap.txt   # e.g. .../3u
+python3 scripts/usb-latency/usbmon_latency.py < /tmp/cap.txt
+```
+
+Read the **`Bo:` row** (bulk OUT) — that is the port's one-way send latency. Ignore `Bi:`
+(receive URBs wait for data, not the port) and any `Ii:` status endpoint. Needs traffic on the
+device while capturing (run Method B in parallel, or `ping` a USB-Ethernet adapter).
+
+### Method B — serial loopback RTT (round-trip)
+
+```bash
+python3 scripts/usb-latency/rtt_loopback.py /dev/ttyUSB0 921600 2000
+#                                            port         baud   samples
+```
+
+Output reports `min / avg / p50 / p99 / p99.9 / max` and a `PASS`/`FAIL` against 5 ms.
+**Judge on `max` / `p99.9`, not the average** — a latency spec is a worst-case claim.
+
+Notes:
+- Use a **high baud (921600)** so the 1-byte UART wire time is negligible and you measure the USB path, not the serial line.
+- In a physical loopback TX and RX share one wire, so a byte is received ~**1 character-time** after send (not two). At 9600 baud that floor is ~1.04 ms — a handy calibration: `min` should track it, proving the measurement is real.
+- `mismatch=0` confirms each echoed byte is the one that was sent. `lost` samples (drain races / timeouts) do not inflate latency and are excluded from the stats.
+- **Control check:** remove the jumper and rerun — it should report **all `lost`, 0 matched** (proves there is no phantom internal echo).
+
+### Interpreting against a 5 ms spec
+
+| If the spec means… | Compare against | Pass if |
+|--------------------|-----------------|---------|
+| **One-way** ≤ 5 ms | usbmon `Bo` max, or RTT max / 2 | ≤ 5 ms |
+| **Round-trip / response** ≤ 5 ms | `rtt_loopback.py` max | ≤ 5 ms |
+
+`RTT ≈ USB-out + device turnaround + USB-in`, so `RTT/2` is an *upper bound* on one-way latency
+(it still carries half the adapter's turnaround). For the true one-way figure, prefer the usbmon `Bo` number.
