@@ -16,9 +16,23 @@
 
 set -euo pipefail
 
-IMAGES=/media/ranshal/jetson/hadron_yocto/build/tmp/deploy/images/hadron-ngx012
+ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+IMAGES=$ROOT_DIR/build/tmp/deploy/images/hadron-ngx012
 KERNEL=$IMAGES/Image
 ROOTFS=$IMAGES/hadron-image-base-hadron-ngx012.rootfs.ext4
+
+if ! command -v qemu-system-aarch64 >/dev/null 2>&1; then
+    echo "Required command not found: qemu-system-aarch64" >&2
+    exit 1
+fi
+if [[ ! -f "$KERNEL" ]]; then
+    echo "Image not found: $KERNEL (run kas build kas.yml first)" >&2
+    exit 1
+fi
+if [[ ! -f "$ROOTFS" ]]; then
+    echo "Rootfs not found: $ROOTFS (run kas build kas.yml first)" >&2
+    exit 1
+fi
 
 LOG_DIR=${HADRON_QEMU_LOGS:-/tmp/hadron-qemu}
 mkdir -p "$LOG_DIR"
@@ -49,7 +63,7 @@ exec qemu-system-aarch64 \
     -m 4096 \
     -smp 4 \
     -kernel "$KERNEL" \
-    -drive if=virtio,file="$ROOTFS",format=raw,cache=unsafe,snapshot=on \
+    -drive "if=virtio,file=$ROOTFS,format=raw,cache=unsafe,snapshot=on" \
     -netdev user,id=net0 \
     -device virtio-net-pci,netdev=net0 \
     -append "root=/dev/vda rw rootfstype=ext4 rootwait earlycon=pl011,mmio32,0x09000000 console=ttyAMA0,115200 mminit_loglevel=4 firmware_class.path=/etc/firmware loglevel=4 no_console_suspend systemd.mask=dev-disk-by\\x2dpartlabel-esp.device" \
