@@ -12,32 +12,45 @@ kas build kas.yml --target hadron-image-desktop
 
 See also: https://connecttech.com/resource-center/l4t-board-support-packages/
 
-## Docker builds and CI boot checks
+## CI: container build and QEMU boot validation
 
-These preparation files are CI-service independent; they do not register a
-runner or flash hardware. `ci/Dockerfile` extends the same digest-pinned
-Scarthgap build image as Lumen and installs `kas==4.8.2`. The base image must
-be available locally or accessible through the internal registry.
+The repo provides a CI build environment (`ci/Dockerfile`) and a boot smoke
+test (`ci/test-qemu-boot.sh`). These files do not register a runner or enable
+a pipeline. Use a runner with Docker access, writable download/sstate caches,
+at least 120 GB free disk space, and 8 GB RAM. The digest-pinned Scarthgap
+base image must be available locally or accessible through the internal
+registry. Run commands from the repo root and do not run concurrent builds
+against the same `build/` directory.
 
-Build the container, then run the noninteractive build helper:
+### 1. Prepare the CI build environment
 
 ```bash
 sudo docker build -f ci/Dockerfile -t hadron-yocto:scarthgap ci
+```
+
+The image includes `kas 4.8.2` and `qemu-system-aarch64`. The build helper
+uses the local image without pulling it automatically. Use `sudo` if your
+user lacks Docker daemon access.
+
+### 2. Build without an interactive terminal
+
+`build-in-docker.sh` runs `kas build kas.yml`, defaults to
+`hadron-image-base`, and returns a nonzero status on failure. It maps the
+invoking user's UID/GID, preserves the checkout's absolute path, and leaves
+build outputs on the host. The QEMU check below requires a successful
+`hadron-image-base` build; the optional desktop target is not the image it
+boots.
+
+```bash
 sudo ./build-in-docker.sh
-# Optional target override:
+# Optional image target:
 sudo ./build-in-docker.sh --target hadron-image-desktop
 ```
 
-The helper defaults to `hadron-image-base` and passes extra arguments to
-`kas build`. It maps the invoking user's UID/GID through the base image's
-entrypoint, preserves the checkout's absolute path, and leaves outputs in
-`build/` on the host. A container/build failure returns a nonzero exit code.
-Do not run host and container builds concurrently against the same `build/`.
-
-Existing cache directories default to
+The helper uses existing host caches at
 `/media/ranshal/jetson/shared/downloads` and
-`/media/ranshal/jetson/shared/sstate`. They must be writable by the invoking
-user. Override them and the container image when needed:
+`/media/ranshal/jetson/shared/sstate`; both must exist and be writable. Override
+the cache paths or image when needed:
 
 ```bash
 sudo HADRON_DL_CACHE=/path/to/downloads \
@@ -46,30 +59,39 @@ sudo HADRON_DL_CACHE=/path/to/downloads \
      ./build-in-docker.sh
 ```
 
-Like Lumen, the helper mounts these host directories at the cache paths
-already configured in `kas.yml`, even when the host directories are
-overridden. Host and container builds use the same kas configuration;
-no CI-specific overlay is needed.
+The helper mounts those host directories at the cache paths configured in
+`kas.yml`, including when the host directories are overridden. Host and
+container builds use the same kas configuration; no CI-specific overlay is
+needed. Configure CI to fail on a nonzero build exit code.
 
-After a successful base-image build, validate the kernel/rootfs on the host
-with `qemu-system-aarch64` installed (`sudo apt install qemu-system-arm`):
+### 3. Check that the generated image reaches a login prompt
+
+Run inside the CI container with the repo mounted, or on a host with QEMU
+installed:
 
 ```bash
-./ci/test-qemu-boot.sh       # Default timeout: 300 seconds
-./ci/test-qemu-boot.sh 120   # Optional timeout
+REPO_PATH="$(pwd -P)"
+sudo docker run --rm \
+    -e UID="$(id -u)" -e GID="$(id -g)" -e USERNAME="$(whoami)" \
+    -w "$REPO_PATH" -v "$REPO_PATH:$REPO_PATH" \
+    hadron-yocto:scarthgap \
+    ./ci/test-qemu-boot.sh 120
 ```
 
-Each run creates fresh logs under `build/qemu-ci/run-*/` (override the parent
-with `HADRON_QEMU_LOGS`). Exit 0 means a login prompt appeared; kernel panic,
-early QEMU exit, or timeout returns 1; invalid arguments return 2. QEMU is
-stopped on success, failure, or interruption. Snapshot mode leaves the
-original rootfs unchanged. Retain `launcher.log` and `console.log` as CI
-artifacts, including failed runs.
+On a host with QEMU installed, run `./ci/test-qemu-boot.sh 120` directly.
+Omit `120` to use the default five-minute timeout. The script returns 0 when
+the serial console reaches a login prompt, 1 on kernel panic, early QEMU exit,
+or timeout, and 2 for invalid arguments. It stops QEMU on success, failure, or
+interruption and preserves logs in a unique directory under
+`build/qemu-ci/run-*/`. The rootfs runs in snapshot mode and remains unchanged.
+This validates software boot only; it does not log in, test GPU/cameras or
+carrier-board interfaces, or emulate Jetson hardware.
 
-This is a software boot smoke test, not a login/authentication test or
-Jetson hardware emulation: GPU, cameras, and carrier-board interfaces are
-not validated. For an interactive session, use `./run-qemu.sh`; its default
-log/socket directory remains `/tmp/hadron-qemu`.
+### 4. Collect CI artifacts
+
+Retain the build job output, the generated rootfs and tegraflash archive under
+`build/tmp/deploy/images/hadron-ngx012/`, and all of `build/qemu-ci/`, including
+failed runs. Each QEMU run contains `launcher.log` and `console.log`.
 
 Run the preparation-file regression checks with:
 
